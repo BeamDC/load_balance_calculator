@@ -1,0 +1,9 @@
+[package]
+name = "load_balance_calculator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[profile.dev.package."*"]
+opt-level = 3
