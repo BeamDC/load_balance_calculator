@@ -1,7 +1,10 @@
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::iter;
+use std::time::Instant;
 use crate::cmd::Args;
+use crate::operation::Operation;
+
 pub fn multiset(state: Vec<u64>) -> Box<[u64]> {
     let mut state = state;
     // ensure state values are sorted
@@ -10,7 +13,6 @@ pub fn multiset(state: Vec<u64>) -> Box<[u64]> {
     res
 }
 
-// return all n length subsequences in state
 pub fn combinations(state: &Vec<u64>, n: u32) -> Vec<Vec<u64>> {
     if n == 0 || n > state.len() as u32 {
         return vec![];
@@ -40,24 +42,69 @@ pub fn combinations(state: &Vec<u64>, n: u32) -> Vec<Vec<u64>> {
     res
 }
 
-pub fn splits(n: u64) -> Vec<(String, Vec<u64>)> {
+fn gcd(mut a: u64, mut b: u64) -> u64 {
+    if a == 0 {
+        return b;
+    } else if b == 0 {
+        return a;
+    }
+    let i = a.trailing_zeros();
+    let j = b.trailing_zeros();
+    let k:u32;
+    if i<j{k=i}
+    else {k=j}
+    a >>= i;
+    b >>= j;
+    loop {
+        if a > b {
+            a^=b;
+            b^=a
+            ;a^=b;
+        }
+        b -= a;
+        if b == 0 {
+            return a << k;
+        }
+        b >>= b.trailing_zeros();
+    }
+}
+
+fn gcd_vec(a: Vec<u64>) -> u64 {
+    let mut res = a[0];
+    for mut i in 1..a.len() {
+        let val = a[i];
+        res = gcd(val, res);
+    }
+    res
+}
+
+fn factorize(a: u64) -> u64 {
+    todo!("get the prime factorization of a");
+}
+
+pub fn splits(n: u64) -> Vec<(Operation, Vec<u64>)> {
+    let mut res = vec![];
+
     let half = n / 2u64;
     let third = n / 3u64;
 
-    let half = iter::repeat(half).take(2).collect::<Vec<u64>>();
-    let third = iter::repeat(third).take(3).collect::<Vec<u64>>();
+    let half_split = iter::repeat(half).take(2).collect::<Vec<u64>>();
+    let third_split = iter::repeat(third).take(3).collect::<Vec<u64>>();
 
-    let half_f64 = half.iter().map(|x| *x as f64 / 1e8).collect::<Vec<f64>>();
-    let third_f64 = third.iter().map(|x| *x as f64 / 1e8).collect::<Vec<f64>>();
-    let n_f64 = n as f64 / 1e8;
+    res.push((Operation::Split {
+        input: n,
+        output: (Some(half), Some(half), None)
+    }, half_split));
 
-    vec![
-        (format!("split {} -> {:?}", n_f64, half_f64), half),
-        (format!("split {} -> {:?}", n_f64, third_f64), third),
-    ]
+    res.push((Operation::Split {
+        input: n,
+        output: (Some(third), Some(third), Some(third))
+    }, third_split));
+
+    res
 }
 
-pub fn merges(state: Vec<u64>) -> Vec<(String, Box<[u64]>)> {
+pub fn merges(state: &Vec<u64>) -> Vec<(Operation, Box<[u64]>)> {
     let mut result = vec![];
     let mut seen = HashSet::new();
 
@@ -79,15 +126,41 @@ pub fn merges(state: Vec<u64>) -> Vec<(String, Box<[u64]>)> {
             remaining.push(merged);
 
             let new_state = multiset(remaining);
-            let combination_f64 = combination.iter().map(|x| *x as f64 / 1e8).collect::<Vec<f64>>();
-            let merged_f64 = merged as f64 / 1e8;
 
-            result.push(
-                (format!("merge {:?} -> {}", combination_f64, merged_f64), new_state)
-            );
+            let operation = match combination.len() {
+                2 => {
+                    Operation::Merge {
+                        input: (Some(combination[0]), Some(combination[1]), None),
+                        output: merged
+                    }
+                }
+                3 => {
+                    Operation::Merge {
+                        input: (Some(combination[0]), Some(combination[1]), Some(combination[2])),
+                        output: merged
+                    }
+                },
+                // this case should never happen
+                _ => {Operation::Err},
+            };
+
+            result.push((operation, new_state));
         }
     }
     result
+}
+
+fn heuristic(state: &Vec<u64>, target: &Vec<u64>, gcd: u64) -> u64 {
+    // check how many matches are the same,
+    // close splits / merges will yield values close to the original.
+    // we want to prioritize states that have more matching values.
+    // we also check against the gcd between input and output,
+    // since those values can be used universally in
+    // creating the target values
+    state.iter()
+        .zip(target)
+        .map(|(&s, &t)| s == t || s == gcd)
+        .count() as u64
 }
 
 pub enum BalancerResult {
@@ -119,7 +192,7 @@ impl Balancer {
         }
     }
 
-    pub fn get_next_states(&self, state: Vec<u64>) -> Vec<(String, Box<[u64]>)> {
+    pub fn get_next_states(&self, state: Vec<u64>) -> Vec<(Operation, Box<[u64]>)> {
         let mut next_states = vec![];
 
         // splits
@@ -136,7 +209,7 @@ impl Balancer {
         }
 
         // merges
-        for (action, merged) in merges(state) {
+        for (action, merged) in merges(&state) {
             if *merged.iter().max().unwrap_or(&0u64) <= self.max_belt {
                 next_states.push((action, multiset(merged.to_vec())));
             }
@@ -146,6 +219,7 @@ impl Balancer {
     }
 
     pub fn find_ideal_balance(&self) -> i32 {
+        let start = Instant::now();
         if self.inputs.iter().sum::<u64>() != self.outputs.iter().sum::<u64>() {
             println!("Unbalanced I/O");
             println!("{} != {}",
@@ -157,14 +231,17 @@ impl Balancer {
 
         let initial_state = multiset(self.inputs.clone());
         let target_state = multiset(self.outputs.clone());
+        let gcd = gcd(
+            gcd_vec(self.inputs.clone()), gcd_vec(self.outputs.clone())
+        );
 
         let mut frontier = BinaryHeap::new();
-
         frontier.push((Reverse(0u64), initial_state.clone()));
+
         let mut visited = HashMap::new();
         visited.insert(initial_state.clone(), 0u64);
 
-        let mut from: HashMap<Box<[u64]>, (Option<String>, Option<Vec<u64>>)> = HashMap::new();
+        let mut from: HashMap<Box<[u64]>, (Option<Operation>, Option<Vec<u64>>)> = HashMap::new();
         from.insert(initial_state.clone(), (None, None));
 
         while let Some((Reverse(cost), current)) = frontier.pop() {
@@ -186,13 +263,16 @@ impl Balancer {
                 for (i, (action, state)) in path.iter().enumerate() {
                     let state = state.iter().map(|x| *x as f64 / 1e8).collect::<Vec<f64>>();
                     println!("{}. {} => {:?}", i + 1, action, state);
-                }
 
+                }
+                println!("Balancer found in {}ms", start.elapsed().as_millis());
                 return path.len() as i32;
             }
 
             for (action, next) in self.get_next_states(current.clone().to_vec()) {
-                let new_cost = cost + 1;
+                let new_cost = cost + action.cost() +
+                    heuristic(&next.to_vec(), &target_state.to_vec(), gcd);
+
                 if visited.get(&next).map_or(true, |&prev_cost| new_cost < prev_cost) {
                     visited.insert(next.clone(), new_cost);
                     from.insert(next.clone(), (Some(action), Some(current.clone().to_vec())));
