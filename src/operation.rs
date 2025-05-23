@@ -19,7 +19,7 @@ impl Operation {
     // higher values are higher priority when used in the queue
     pub fn cost(&self) -> u64 {
         match self {
-            // if we call cost on this something has gone horribly wrong
+            // if we call cost on Err something has gone horribly wrong
             Operation::Err => 0,
             Operation::Split {input: _, output: _} => 1,
             Operation::Merge {input: _, output: _} => 3,
@@ -59,6 +59,25 @@ impl fmt::Display for Operation {
                     write!(f, "merge {}, {}, {} -> {}", t1, t2, t3, output)
                 }
             }
+        }
+    }
+}
+
+impl PartialEq for Operation {
+
+    fn eq(&self, other: &Operation) -> bool {
+        let mut is_err = false;
+        let mut is_merge = false;
+        let mut is_split = false;
+        match self {
+            Operation::Err => { is_err = true;},
+            Operation::Split { input, output} => { is_split = true; },
+            Operation::Merge {input, output} => { is_merge = true; },
+        }
+        match other {
+            Operation::Err => { is_err },
+            Operation::Split {input, output} => { is_split },
+            Operation::Merge {input, output} => { is_merge },
         }
     }
 }
