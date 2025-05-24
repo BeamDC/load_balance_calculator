@@ -1,8 +1,7 @@
-use std::{fmt, iter};
-use std::fmt::{Formatter};
-use std::iter::{Repeat, Take};
 use crate::cmd::Args;
 use crate::operation::Operation;
+use std::fmt::Formatter;
+use std::fmt;
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BalancerState {
@@ -66,13 +65,19 @@ impl Balancer {
 }
 
 pub struct BalancerResult {
-    path: Vec<(Operation, BalancerState)>
+    path: Vec<(Operation, BalancerState)>,
+    total_states: u64,
+    checked_states: u64,
+    time: f64,
 }
 
 impl BalancerResult {
-    pub fn new(path: Vec<(Operation, BalancerState)>) -> BalancerResult {
+    pub fn new(path: Vec<(Operation, BalancerState)>, total: u64, checked: u64, time: f64) -> BalancerResult {
         BalancerResult {
-            path
+            path,
+            total_states: total,
+            checked_states: checked,
+            time
         }
     }
 
@@ -83,13 +88,21 @@ impl BalancerResult {
 
 impl Default for BalancerResult {
     fn default() -> BalancerResult {
-        BalancerResult::new(vec![])
+        BalancerResult::new(vec![],0,0,0.)
     }
 }
 
 impl fmt::Display for BalancerResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "TODO: Finish Display process")
+        writeln!(f, "{} of {} states checked ({:.3}%)",
+            self.checked_states, self.total_states,
+            self.checked_states as f64 / self.total_states as f64 * 100.0
+        )?;
+        for (i, (op, state))in self.iter().enumerate() {
+            writeln!(f, "{}. {} => {}", i + 1, op, state)?;
+        }
+
+        write!(f, "solution found in {:.8}s", self.time)
     }
 }
 

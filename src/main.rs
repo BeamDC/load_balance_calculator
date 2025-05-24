@@ -25,9 +25,7 @@ fn main() {
         }
         let balancer = Balancer::new(args);
         let result = balancer.find_ideal_balance();
-        for (i, (op, state))in result.iter().enumerate() {
-            println!("{}. {} => {}", i + 1, op, state)
-        }
+
         println!("{}", result);
     }
 }

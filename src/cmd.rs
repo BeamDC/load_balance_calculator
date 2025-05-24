@@ -88,9 +88,7 @@ pub fn read_input() -> String {
     let mut buffer = String::new();
     let stdin = io::stdin().read_line(&mut buffer);
     match stdin {
-        Ok(_) => {
-            println!("compiling command: {}", buffer);
-        }
+        Ok(_) => {}
         Err(error) => {
             println!("error: {}", error);
         }

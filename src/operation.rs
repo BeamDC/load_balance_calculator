@@ -3,8 +3,8 @@ use std::fmt::Formatter;
 
 #[derive(Clone)]
 pub enum Operation {
-    Err,
-    Merge {
+    Err,Merge {
+
         input: (Option<u64>, Option<u64>, Option<u64>),
         output: u64,
     },
@@ -17,12 +17,12 @@ pub enum Operation {
 impl Operation {
     // cost function for giving priority to different operations,
     // higher values are higher priority when used in the queue
-    pub fn cost(&self) -> u64 {
+    pub fn cost(&self) -> i64 {
         match self {
             // if we call cost on Err something has gone horribly wrong
             Operation::Err => 0,
             Operation::Split {input: _, output: _} => 1,
-            Operation::Merge {input: _, output: _} => 3,
+            Operation::Merge {input: _, output: _} => 1,
         }
     }
 }
@@ -71,13 +71,80 @@ impl PartialEq for Operation {
         let mut is_split = false;
         match self {
             Operation::Err => { is_err = true;},
-            Operation::Split { input, output} => { is_split = true; },
-            Operation::Merge {input, output} => { is_merge = true; },
+            Operation::Split { input: _, output: _} => { is_split = true; },
+            Operation::Merge {input: _, output: _} => { is_merge = true; },
         }
         match other {
             Operation::Err => { is_err },
-            Operation::Split {input, output} => { is_split },
-            Operation::Merge {input, output} => { is_merge },
+            Operation::Split {input: _, output: _} => { is_split },
+            Operation::Merge {input: _, output: _} => { is_merge },
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum ReverseOperation {
+    Err,
+    Merge {
+        input: (Option<u64>, Option<u64>, Option<u64>),
+        output: u64
+    },
+    Split {
+        input: u64,
+        output: (Option<u64>, Option<u64>, Option<u64>),
+    }
+}
+
+impl ReverseOperation {
+    pub fn cost(&self) -> i64 {
+        match self {
+            ReverseOperation::Err => 0,
+            ReverseOperation::Split {input: _, output: _} => 1,
+            ReverseOperation::Merge {input: _, output: _} => 1,
+        }
+    }
+
+    pub fn forward(&self) -> Operation {
+        match self {
+            ReverseOperation::Err => Operation::Err,
+            ReverseOperation::Split {input, output} => {
+                Operation::Merge {
+                    input: *output,
+                    output: *input
+                }
+            }
+            ReverseOperation::Merge {input, output} => {
+                Operation::Split {
+                    input: *output,
+                    output: *input
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Display for ReverseOperation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let fwd = self.forward();
+        write!(f, "{}", fwd)
+    }
+}
+
+impl PartialEq for ReverseOperation {
+
+    fn eq(&self, other: &ReverseOperation) -> bool {
+        let mut is_err = false;
+        let mut is_merge = false;
+        let mut is_split = false;
+        match self {
+            ReverseOperation::Err => { is_err = true;},
+            ReverseOperation::Split { input: _, output: _} => { is_split = true; },
+            ReverseOperation::Merge {input: _, output: _} => { is_merge = true; },
+        }
+        match other {
+            ReverseOperation::Err => { is_err },
+            ReverseOperation::Split {input: _, output: _} => { is_split },
+            ReverseOperation::Merge {input: _, output: _} => { is_merge },
         }
     }
 }
